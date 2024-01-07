@@ -67,18 +67,34 @@ module.exports.CreateChannel = async ()=>{
   }
 }
 
+//Pubish messages
+module.exports.PublishMessage = (channel, service, msg) => {
+  channel.publish(EXCHANGE_NAME, service, Buffer.from(msg));
+  console.log("Sent: ", msg);
+};
 
 
 //Subscribe messages
-module.exports.SubscribeMessage = async (channel,service)=>{
-  const appQueue = await channel.assertQueue(QUEUE_NAME);
-  channel.bindQueue(appQueue.queue,EXCHANGE_NAME,CUSTOMER_BINDING_KEY);
-  channel.consume(appQueue.queue,data =>{
-    console.log('recieved data');
-    console.log(data.content.toString())
-    service.SubscribeEvents(data.content.toString())
-    channel.ack(data)
-  })
-}
+module.exports.SubscribeMessage = async (channel, service) => {
+  await channel.assertExchange(EXCHANGE_NAME, "direct", { durable: true });
+  const q = await channel.assertQueue("", { exclusive: true });
+  console.log(` Waiting for messages in queue: ${q.queue}`);
+
+  channel.bindQueue(q.queue, EXCHANGE_NAME, CUSTOMER_SERVICE);
+
+  channel.consume(
+    q.queue,
+    (msg) => {
+      if (msg.content) {
+        console.log("the message is:", msg.content.toString());
+        service.SubscribeEvents(msg.content.toString());
+      }
+      console.log("[X] received");
+    },
+    {
+      noAck: true,
+    }
+  );
+};
 
 
